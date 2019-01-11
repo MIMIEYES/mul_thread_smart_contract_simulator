@@ -23,6 +23,7 @@
  */
 package io.nuls.callable;
 
+import io.nuls.helper.ContractConflictChecker;
 import io.nuls.kernel.model.Result;
 import io.nuls.model.CallableResult;
 import io.nuls.model.ContractData;
@@ -35,6 +36,7 @@ import org.spongycastle.util.encoders.Hex;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.Callable;
 
 /**
@@ -50,13 +52,17 @@ public class ContractTxCallable implements Callable<CallableResult> {
     private List<Transaction> txList;
     private long number;
     private String preStateRoot;
+    private ContractConflictChecker checker;
+    private Set<String> commitSet;
 
 
-    public ContractTxCallable(String contract, List<Transaction> txList, long number, String preStateRoot) {
+    public ContractTxCallable(String contract, List<Transaction> txList, long number, String preStateRoot, ContractConflictChecker checker, Set<String> commitSet) {
         this.contract = contract;
         this.txList = txList;
         this.number = number;
         this.preStateRoot = preStateRoot;
+        this.checker = checker;
+        this.commitSet = commitSet;
     }
 
     @Override
@@ -67,6 +73,7 @@ public class ContractTxCallable implements Callable<CallableResult> {
         callableResult.setResultList(resultList);
 
         ContractData contractData;
+        //TODO 创建合约时，List应该只有一条，如果出现多条，其他的跳过执行，视作失败
         contractVM.createBatchExecute(Hex.decode(preStateRoot));
         for(Transaction tx : txList) {
             contractData = tx.getTxData();
@@ -75,7 +82,8 @@ public class ContractTxCallable implements Callable<CallableResult> {
                     resultList.add(contractVM.create(contractData, number, preStateRoot));
                     break;
                 case 101 :
-                    resultList.add(contractVM.call(contractData, number, preStateRoot));
+                    ContractResult contractResult = contractVM.call(contractData, number, preStateRoot);
+                    checkAndDealContractResult(tx, resultList, contractResult);
                     break;
                 case 102 :
                     resultList.add(contractVM.delete(contractData, number, preStateRoot));
@@ -88,6 +96,16 @@ public class ContractTxCallable implements Callable<CallableResult> {
         //Result<byte[]> result = contractVM.commitBatchExecute();
         //contractVM.removeBatchExecute();
         return callableResult;
+    }
+
+    private void checkAndDealContractResult(Transaction tx, List<ContractResult> resultList, ContractResult contractResult) {
+        boolean isConflict = checker.checkConflictAndCommit(tx, contractResult, commitSet);
+        if(isConflict) {
+            //TODO 合约结果设置为失败
+            contractResult.setError(true);
+            contractResult.setRevert(true);
+        }
+        resultList.add(contractResult);
     }
 
 }

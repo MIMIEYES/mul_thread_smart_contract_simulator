@@ -25,14 +25,12 @@ package io.nuls.service.impl;
 
 import io.nuls.callable.ContractTxCallable;
 import io.nuls.executor.ContractExecutor;
+import io.nuls.helper.ContractConflictChecker;
 import io.nuls.model.CallableResult;
 import io.nuls.model.Transaction;
 import io.nuls.service.ContractCaller;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 
@@ -51,11 +49,18 @@ public class ContractCallerImpl implements ContractCaller {
         try {
             ContractExecutor contractExecutor = ContractExecutor.newInstance();
 
+            ContractConflictChecker checker = ContractConflictChecker.newInstance();
+            Set<String>[] sets = new Set[txMap.size()];
+            checker.setContractSetArray(sets);
             Set<Map.Entry<String, List<Transaction>>> entries = txMap.entrySet();
+            Set<String> commitSet;
+            int i = 0;
             for(Map.Entry<String, List<Transaction>> addressTxs : entries) {
+                commitSet = new HashSet<>();
+                sets[i++] = commitSet;
                 String contract = addressTxs.getKey();
                 List<Transaction> txList = addressTxs.getValue();
-                contractExecutor.add(new ContractTxCallable(contract, txList, number, preStateRoot));
+                contractExecutor.add(new ContractTxCallable(contract, txList, number, preStateRoot, checker, commitSet));
             }
 
             List<Future<CallableResult>> executeList = contractExecutor.execute();

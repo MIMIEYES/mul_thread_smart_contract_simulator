@@ -52,9 +52,10 @@ public class ContractServiceImpl implements ContractService {
     public Result invokeContract(List<Transaction> txList, long number, String preStateRoot) {
         Map<String, List<Transaction>> listMap = addressDistribution.distribution(txList);
         List<CallableResult> callableResultList = contractCaller.caller(listMap, number, preStateRoot);
-        AnalyzerResult analyzerResult = resultAnalyzer.analysis(callableResultList);
-        List<ContractResult> resultList = resultHanlder.handleAnalyzerResult(callableResultList, analyzerResult, number, preStateRoot);
-        return Result.getSuccess().setData(resultList);
+        //AnalyzerResult analyzerResult = resultAnalyzer.analysis(callableResultList);
+        //List<ContractResult> resultList = resultHanlder.handleAnalyzerResult(callableResultList, analyzerResult, number, preStateRoot);
+        //return Result.getSuccess().setData(resultList);
+        return Result.getSuccess();
     }
 
 }
