@@ -27,7 +27,6 @@ package io.nuls.model;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import io.nuls.constant.ErrorCode;
-import org.apache.commons.lang3.StringUtils;
 
 import java.io.Serializable;
 

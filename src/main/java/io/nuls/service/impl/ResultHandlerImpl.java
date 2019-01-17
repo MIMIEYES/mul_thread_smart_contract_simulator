@@ -23,8 +23,8 @@
  */
 package io.nuls.service.impl;
 
+import io.nuls.contract.vm.program.ProgramExecutor;
 import io.nuls.model.AnalyzerResult;
-import io.nuls.model.CallableResult;
 import io.nuls.model.ContractResult;
 import io.nuls.model.Transaction;
 import io.nuls.service.ContractCaller;
@@ -33,12 +33,8 @@ import io.nuls.utils.BeanContext;
 import io.nuls.utils.CompareTx;
 
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.stream.Collectors;
-
-import static org.apache.commons.lang3.StringUtils.EMPTY;
 
 /**
  * @author: PierreLuo
@@ -49,28 +45,24 @@ public class ResultHandlerImpl implements ResultHanlder {
     private ContractCaller contractCaller = BeanContext.getBean(ContractCaller.class);
 
     @Override
-    public List<ContractResult> handleAnalyzerResult(List<CallableResult> callableResultList, AnalyzerResult analyzerResult, long number, String preStateRoot) {
+    public List<ContractResult> handleAnalyzerResult(ProgramExecutor batchExecutor, AnalyzerResult analyzerResult, long number, String preStateRoot) {
+
         // 得到重新执行的合约结果
-        List<ContractResult> reCallResultList = handleAnalyzerResult(analyzerResult, number, preStateRoot);
+        List<ContractResult> reCallResultList = this.reCall(batchExecutor, analyzerResult, number, preStateRoot);
+        // 组装所以的合约结果
         List<ContractResult> finalResultList = new ArrayList<>();
-        // 得到第一次所有交易的合约执行结果
-        callableResultList.stream().forEach(c -> finalResultList.addAll(c.getResultList()));
+        finalResultList.addAll(analyzerResult.getSuccessList());
+        finalResultList.addAll(analyzerResult.getFailedList());
         finalResultList.addAll(reCallResultList);
-        // 将重新执行过的合约结果覆盖原有的执行结果
-        LinkedHashMap<String, ContractResult> linkedHashMap = finalResultList.stream().collect(Collectors.toMap(
-                ContractResult::getTxHash, ContractResult -> ContractResult, (c1, c2) -> c2, LinkedHashMap::new));
-        return linkedHashMap.values().stream().sorted(CompareTx.getInstance()).collect(Collectors.toList());
+        // 按时间排序
+        return finalResultList.stream().sorted(CompareTx.getInstance()).collect(Collectors.toList());
     }
 
-    private List<ContractResult> handleAnalyzerResult(AnalyzerResult analyzerResult, long number, String preStateRoot) {
+    private List<ContractResult> reCall(ProgramExecutor batchExecutor, AnalyzerResult analyzerResult, long number, String preStateRoot) {
         // 重新执行合约
         List<ContractResult> list = analyzerResult.getReCallTxList();
         List<Transaction> collect = list.stream().map(c -> c.getTx()).collect(Collectors.toList());
-        Map<String, List<Transaction>> listMap = new LinkedHashMap<>(4);
-        listMap.put(EMPTY, collect);
-        List<CallableResult> callableResultList = contractCaller.caller(listMap, number, preStateRoot);
-        List<ContractResult> resultList = new ArrayList<>();
-        callableResultList.stream().forEach(c -> resultList.addAll(c.getResultList()));
+        List<ContractResult> resultList = contractCaller.callerReCallTx(batchExecutor, collect, number, preStateRoot);
         return resultList;
     }
 }

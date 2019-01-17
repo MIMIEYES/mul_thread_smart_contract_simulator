@@ -24,7 +24,7 @@
 
 package io.nuls.service;
 
-import io.nuls.kernel.model.Result;
+import io.nuls.contract.vm.program.ProgramExecutor;
 import io.nuls.model.ContractData;
 import io.nuls.model.ContractResult;
 
@@ -34,15 +34,12 @@ import io.nuls.model.ContractResult;
  */
 public interface ContractVM {
 
-    ContractResult create(ContractData contractData, long number, String preStateRoot);
+    ContractResult create(ProgramExecutor executor, ContractData contractData, long number, String preStateRoot);
 
-    ContractResult call(ContractData contractData, long number, String preStateRoot);
+    ContractResult call(ProgramExecutor executor, ContractData contractData, long number, String preStateRoot);
 
-    ContractResult delete(ContractData contractData, long number, String preStateRoot);
+    ContractResult delete(ProgramExecutor executor, ContractData contractData, long number, String preStateRoot);
 
-    void createBatchExecute(byte[] stateRoot);
+    ProgramExecutor createBatchExecute(byte[] stateRoot);
 
-    Result<byte[]> commitBatchExecute();
-
-    void removeBatchExecute();
 }

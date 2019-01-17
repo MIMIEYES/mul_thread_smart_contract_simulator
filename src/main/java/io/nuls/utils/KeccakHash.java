@@ -1,7 +1,7 @@
 /**
  * MIT License
  * <p>
- * Copyright (c) 2017-2018 nuls.io
+ * Copyright (c) 2017-2019 nuls.io
  * <p>
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -21,34 +21,40 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-package io.nuls.model;
+package io.nuls.utils;
 
-import lombok.Getter;
-import lombok.Setter;
-
-import java.util.*;
+import io.nuls.core.tools.crypto.Hex;
+import org.spongycastle.crypto.Digest;
+import org.spongycastle.crypto.digests.KeccakDigest;
 
 /**
  * @author: PierreLuo
- * @date: 2018/11/21
+ * @date: 2018/11/8
  */
-@Getter
-@Setter
-public class CallableResult {
+public class KeccakHash {
 
-    private String contract;
-    private List<ContractResult> resultList;
-    private List<ContractResult> reCallList;
-    private Map<String, Set<ContractResult>> failedMap;
-
-    public static CallableResult newInstance() {
-        return new CallableResult();
+    public static String keccak(String src) {
+        if(src == null || src.length() == 0) {
+            return null;
+        }
+        try {
+            byte[] bytes = Hex.decode(src);
+            return keccak(bytes);
+        } catch (Exception e) {
+            return null;
+        }
     }
 
-    public CallableResult() {
-        this.resultList = new ArrayList<>();
-        this.reCallList = new ArrayList<>();
-        this.failedMap = new HashMap<>();
+    public static String keccak(byte[] bytes) {
+        return keccak(bytes, 256);
+    }
+
+    public static String keccak(byte[] bytes, int bitLength) {
+        Digest digest = new KeccakDigest(bitLength);
+        digest.update(bytes, 0, bytes.length);
+        byte[] rsData = new byte[digest.getDigestSize()];
+        digest.doFinal(rsData, 0);
+        return Hex.encode(rsData);
     }
 
 }

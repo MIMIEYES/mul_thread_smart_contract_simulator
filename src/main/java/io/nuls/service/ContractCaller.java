@@ -24,8 +24,10 @@
 
 package io.nuls.service;
 
-import io.nuls.model.CallableResult;
+import io.nuls.contract.vm.program.ProgramExecutor;
+import io.nuls.model.CallerResult;
 import io.nuls.model.ContractResult;
+import io.nuls.model.Result;
 import io.nuls.model.Transaction;
 
 import java.util.List;
@@ -37,6 +39,10 @@ import java.util.Map;
  */
 public interface ContractCaller {
 
-    List<CallableResult> caller(Map<String, List<Transaction>> txMap, long number, String preStateRoot);
+    CallerResult caller(Map<String, List<Transaction>> txMap, long number, String preStateRoot);
+
+    List<ContractResult> callerReCallTx(ProgramExecutor batchExecutor, List<Transaction> reCallTxList, long number, String preStateRoot);
+
+    Result<byte[]> commitBatchExecute(ProgramExecutor executor);
 
 }

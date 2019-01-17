@@ -24,11 +24,9 @@
 package io.nuls.service.impl;
 
 import io.nuls.contract.constant.ContractConstant;
-import io.nuls.contract.constant.ContractErrorCode;
 import io.nuls.contract.dto.ContractTransfer;
 import io.nuls.contract.vm.program.*;
 import io.nuls.kernel.model.Na;
-import io.nuls.kernel.model.Result;
 import io.nuls.kernel.utils.AddressTool;
 import io.nuls.model.ContractData;
 import io.nuls.model.ContractResult;
@@ -51,11 +49,8 @@ public class NVM implements ContractVM {
 
     private ProgramExecutor programExecutor;
 
-    private ThreadLocal<ProgramExecutor> localProgramExecutor = new ThreadLocal<>();
-
     @Override
-    public ContractResult create(ContractData create, long number, String preStateRoot) {
-        ProgramExecutor executor = localProgramExecutor.get();
+    public ContractResult create(ProgramExecutor executor, ContractData create, long number, String preStateRoot) {
         String contractAddress = create.getContractAddress();
         String sender = create.getSender();
         long price = create.getPrice();
@@ -103,8 +98,7 @@ public class NVM implements ContractVM {
     }
 
     @Override
-    public ContractResult call(ContractData call, long number, String preStateRoot) {
-        ProgramExecutor executor = localProgramExecutor.get();
+    public ContractResult call(ProgramExecutor executor, ContractData call, long number, String preStateRoot) {
         String contractAddress = call.getContractAddress();
         String sender = call.getSender();
         long price = call.getPrice();
@@ -156,8 +150,7 @@ public class NVM implements ContractVM {
     }
 
     @Override
-    public ContractResult delete(ContractData delete, long number, String preStateRoot) {
-        ProgramExecutor executor = localProgramExecutor.get();
+    public ContractResult delete(ProgramExecutor executor, ContractData delete, long number, String preStateRoot) {
         String contractAddress = delete.getContractAddress();
         String sender = delete.getSender();
 
@@ -193,29 +186,12 @@ public class NVM implements ContractVM {
     }
 
     @Override
-    public void createBatchExecute(byte[] stateRoot) {
-        localProgramExecutor.remove();
+    public ProgramExecutor createBatchExecute(byte[] stateRoot) {
         if(stateRoot == null) {
-            return;
+            return null;
         }
         ProgramExecutor executor = programExecutor.begin(stateRoot);
-        localProgramExecutor.set(executor);
-    }
-
-    @Override
-    public Result<byte[]> commitBatchExecute() {
-        ProgramExecutor executor = localProgramExecutor.get();
-        if(executor == null) {
-            return Result.getSuccess();
-        }
-        executor.commit();
-        byte[] stateRoot = executor.getRoot();
-        return Result.getSuccess().setData(stateRoot);
-    }
-
-    @Override
-    public void removeBatchExecute() {
-        localProgramExecutor.remove();
+        return executor;
     }
 
     private List<ContractTransfer> generateContractTransfer(List<ProgramTransfer> transfers) {

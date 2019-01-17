@@ -26,7 +26,6 @@ package io.nuls.utils;
 import org.apache.commons.codec.binary.Hex;
 import org.spongycastle.crypto.Digest;
 import org.spongycastle.crypto.digests.SHA3Digest;
-import org.spongycastle.crypto.digests.SHAKEDigest;
 
 import java.nio.charset.StandardCharsets;
 
@@ -49,14 +48,6 @@ public class Sha3Hash {
 
     public static String sha3(byte[] bytes, int bitLength) {
         Digest digest = new SHA3Digest(bitLength);
-        digest.update(bytes, 0, bytes.length);
-        byte[] rsData = new byte[digest.getDigestSize()];
-        digest.doFinal(rsData, 0);
-        return Hex.encodeHexString(rsData);
-    }
-
-    public static String shake(byte[] bytes, int bitLength) {
-        Digest digest = new SHAKEDigest(bitLength);
         digest.update(bytes, 0, bytes.length);
         byte[] rsData = new byte[digest.getDigestSize()];
         digest.doFinal(rsData, 0);

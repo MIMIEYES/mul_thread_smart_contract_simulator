@@ -24,14 +24,15 @@
 package io.nuls.service.impl;
 
 import io.nuls.callable.ContractTxCallable;
+import io.nuls.contract.vm.program.ProgramExecutor;
 import io.nuls.executor.ContractExecutor;
 import io.nuls.helper.ContractConflictChecker;
-import io.nuls.model.CallableResult;
-import io.nuls.model.Transaction;
+import io.nuls.model.*;
 import io.nuls.service.ContractCaller;
+import io.nuls.service.ContractVM;
+import org.spongycastle.util.encoders.Hex;
 
 import java.util.*;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 
 /**
@@ -40,13 +41,19 @@ import java.util.concurrent.Future;
  */
 public class ContractCallerImpl implements ContractCaller {
 
+    private ContractVM contractVM;
 
 
     @Override
-    public List<CallableResult> caller(Map<String, List<Transaction>> txMap, long number, String preStateRoot) {
-        List<CallableResult> resultList = new ArrayList<>();
+    public CallerResult caller(Map<String, List<Transaction>> txMap, long number, String preStateRoot) {
 
+        List<CallableResult> resultList = new ArrayList<>();
+        CallerResult callerResult = new CallerResult();
         try {
+            ProgramExecutor batchExecute = contractVM.createBatchExecute(Hex.decode(preStateRoot));
+            callerResult.setCallableResultList(resultList);
+            callerResult.setProgramExecutor(batchExecute);
+
             ContractExecutor contractExecutor = ContractExecutor.newInstance();
 
             ContractConflictChecker checker = ContractConflictChecker.newInstance();
@@ -54,30 +61,62 @@ public class ContractCallerImpl implements ContractCaller {
             checker.setContractSetArray(sets);
             Set<Map.Entry<String, List<Transaction>>> entries = txMap.entrySet();
             Set<String> commitSet;
+
             int i = 0;
             for(Map.Entry<String, List<Transaction>> addressTxs : entries) {
                 commitSet = new HashSet<>();
                 sets[i++] = commitSet;
                 String contract = addressTxs.getKey();
                 List<Transaction> txList = addressTxs.getValue();
-                contractExecutor.add(new ContractTxCallable(contract, txList, number, preStateRoot, checker, commitSet));
+                contractExecutor.add(new ContractTxCallable(batchExecute, contract, txList, number, preStateRoot, checker, commitSet));
             }
 
             List<Future<CallableResult>> executeList = contractExecutor.execute();
             if(executeList == null) {
-                return resultList;
+                return callerResult;
             }
             for(Future<CallableResult> future : executeList) {
                 CallableResult callableResult = future.get();
                 resultList.add(callableResult);
             }
 
-            return resultList;
-        } catch (InterruptedException e) {
-            e.printStackTrace();
-        } catch (ExecutionException e) {
+        } catch (Exception e) {
             e.printStackTrace();
         }
-        return null;
+        return callerResult;
     }
+
+    @Override
+    public List<ContractResult> callerReCallTx(ProgramExecutor batchExecutor, List<Transaction> reCallTxList, long number, String preStateRoot) {
+        List<ContractResult> resultList = new ArrayList<>();
+        ContractData contractData;
+        for(Transaction tx : reCallTxList) {
+            contractData = tx.getTxData();
+            switch (tx.getType()) {
+                case 100 :
+                    resultList.add(contractVM.create(batchExecutor, contractData, number, preStateRoot));
+                    break;
+                case 101 :
+                    resultList.add(contractVM.call(batchExecutor, contractData, number, preStateRoot));
+                    break;
+                case 102 :
+                    resultList.add(contractVM.delete(batchExecutor, contractData, number, preStateRoot));
+                    break;
+                default:
+                    break;
+            }
+        }
+        return resultList;
+    }
+
+    @Override
+    public Result<byte[]> commitBatchExecute(ProgramExecutor executor) {
+        if(executor == null) {
+            return Result.getSuccess();
+        }
+        executor.commit();
+        byte[] stateRoot = executor.getRoot();
+        return Result.getSuccess().setData(stateRoot);
+    }
+
 }

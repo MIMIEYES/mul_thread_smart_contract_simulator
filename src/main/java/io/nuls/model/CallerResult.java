@@ -23,32 +23,22 @@
  */
 package io.nuls.model;
 
+import io.nuls.contract.vm.program.ProgramExecutor;
 import lombok.Getter;
 import lombok.Setter;
 
-import java.util.*;
+import java.util.List;
 
 /**
  * @author: PierreLuo
- * @date: 2018/11/21
+ * @date: 2019-01-17
  */
 @Getter
 @Setter
-public class CallableResult {
+public class CallerResult {
 
-    private String contract;
-    private List<ContractResult> resultList;
-    private List<ContractResult> reCallList;
-    private Map<String, Set<ContractResult>> failedMap;
+    private ProgramExecutor programExecutor;
 
-    public static CallableResult newInstance() {
-        return new CallableResult();
-    }
-
-    public CallableResult() {
-        this.resultList = new ArrayList<>();
-        this.reCallList = new ArrayList<>();
-        this.failedMap = new HashMap<>();
-    }
+    private List<CallableResult> callableResultList;
 
 }

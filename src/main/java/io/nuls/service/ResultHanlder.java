@@ -24,6 +24,7 @@
 
 package io.nuls.service;
 
+import io.nuls.contract.vm.program.ProgramExecutor;
 import io.nuls.model.AnalyzerResult;
 import io.nuls.model.CallableResult;
 import io.nuls.model.ContractResult;
@@ -36,5 +37,5 @@ import java.util.List;
  */
 public interface ResultHanlder {
 
-    List<ContractResult> handleAnalyzerResult(List<CallableResult> callableResultList, AnalyzerResult analyzerResult, long number, String preStateRoot);
+    List<ContractResult> handleAnalyzerResult(ProgramExecutor batchExecutor, AnalyzerResult analyzerResult, long number, String preStateRoot);
 }

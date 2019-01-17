@@ -34,6 +34,8 @@ import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.locks.ReentrantLock;
 
+import static io.nuls.utils.ContractUtil.collectAddress;
+
 /**
  * @author: PierreLuo
  * @date: 2019/1/11
@@ -63,7 +65,7 @@ public class ContractConflictChecker {
             }
             dealResult(tx, contractResult);
             commitSet.addAll(collectAddress);
-            return false;
+            return isConflict;
         } finally {
             lock.unlock();
         }
@@ -76,6 +78,7 @@ public class ContractConflictChecker {
 
     private boolean containAddress(String address, Set<String> commitSet) {
         for(Set<String> set : contractSetArray) {
+            // 排除掉自己线程执行的智能合约，因为自己线程执行的合约是排队顺序执行，不会冲突
             if(set == commitSet) {
                 continue;
             }
@@ -84,22 +87,6 @@ public class ContractConflictChecker {
             }
         }
         return false;
-    }
-
-    private static Set<String> collectAddress(ContractResult result) {
-        Set<String> set = new HashSet<>();
-        set.add(AddressTool.getStringAddressByBytes(result.getContractAddress()));
-        set.addAll(result.getContractAddressInnerCallSet());
-
-        result.getTransfers().stream().forEach(transfer -> {
-            if(ContractUtil.isLegalContractAddress(transfer.getFrom())) {
-                set.add(AddressTool.getStringAddressByBytes(transfer.getFrom()));
-            }
-            if(ContractUtil.isLegalContractAddress(transfer.getTo())) {
-                set.add(AddressTool.getStringAddressByBytes(transfer.getTo()));
-            }
-        });
-        return set;
     }
 
 }

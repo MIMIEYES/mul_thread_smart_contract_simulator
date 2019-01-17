@@ -26,7 +26,10 @@ package io.nuls.model;
 import lombok.Getter;
 import lombok.Setter;
 
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 /**
  * @author: PierreLuo
@@ -36,8 +39,20 @@ import java.util.List;
 @Setter
 public class AnalyzerResult {
 
-    private List<String> isTerminatedContractAddressList;
-
     private List<ContractResult> reCallTxList;
+
+    private List<ContractResult> successList;
+
+    private Set<ContractResult> failedList;
+
+    public static AnalyzerResult newInstance() {
+        return new AnalyzerResult();
+    }
+
+    public AnalyzerResult() {
+        this.reCallTxList = new ArrayList<>();
+        this.successList = new ArrayList<>();
+        this.failedList = new HashSet<>();
+    }
 
 }

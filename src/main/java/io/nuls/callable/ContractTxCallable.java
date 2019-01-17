@@ -23,8 +23,9 @@
  */
 package io.nuls.callable;
 
+import io.nuls.contract.vm.program.ProgramExecutor;
+import io.nuls.core.tools.log.Log;
 import io.nuls.helper.ContractConflictChecker;
-import io.nuls.kernel.model.Result;
 import io.nuls.model.CallableResult;
 import io.nuls.model.ContractData;
 import io.nuls.model.ContractResult;
@@ -32,12 +33,13 @@ import io.nuls.model.Transaction;
 import io.nuls.service.ContractVM;
 import lombok.Getter;
 import lombok.Setter;
-import org.spongycastle.util.encoders.Hex;
 
-import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Callable;
+
+import static io.nuls.utils.ContractUtil.*;
 
 /**
  * @author: PierreLuo
@@ -48,6 +50,7 @@ import java.util.concurrent.Callable;
 public class ContractTxCallable implements Callable<CallableResult> {
 
     private ContractVM contractVM;
+    private ProgramExecutor executor;
     private String contract;
     private List<Transaction> txList;
     private long number;
@@ -56,7 +59,8 @@ public class ContractTxCallable implements Callable<CallableResult> {
     private Set<String> commitSet;
 
 
-    public ContractTxCallable(String contract, List<Transaction> txList, long number, String preStateRoot, ContractConflictChecker checker, Set<String> commitSet) {
+    public ContractTxCallable(ProgramExecutor executor, String contract, List<Transaction> txList, long number, String preStateRoot, ContractConflictChecker checker, Set<String> commitSet) {
+        this.executor = executor;
         this.contract = contract;
         this.txList = txList;
         this.number = number;
@@ -68,44 +72,101 @@ public class ContractTxCallable implements Callable<CallableResult> {
     @Override
     public CallableResult call() throws Exception {
         CallableResult callableResult = CallableResult.newInstance();
-        List<ContractResult> resultList = new ArrayList<>();
+        List<ContractResult> resultList = callableResult.getResultList();
         callableResult.setContract(contract);
-        callableResult.setResultList(resultList);
 
         ContractData contractData;
-        //TODO 创建合约时，List应该只有一条，如果出现多条，其他的跳过执行，视作失败
-        contractVM.createBatchExecute(Hex.decode(preStateRoot));
+        // 创建合约无论成功与否，后续的其他的跳过执行，视作失败 -> 合约锁定中或者合约不存在
+        // 删除合约成功后，后续的其他的跳过执行，视作失败 -> 合约已删除
+        boolean hasCreate = false;
+        boolean isDelete = false;
+        ContractResult contractResult;
         for(Transaction tx : txList) {
             contractData = tx.getTxData();
+            if(hasCreate) {
+                resultList.add(ContractResult.getFailed(contractData, "contract lock or not exist."));
+                continue;
+            }
+            if(isDelete) {
+                resultList.add(ContractResult.getFailed(contractData, "contract has been terminated."));
+                continue;
+            }
             switch (tx.getType()) {
                 case 100 :
-                    resultList.add(contractVM.create(contractData, number, preStateRoot));
+                    hasCreate = true;
+                    contractResult = contractVM.create(executor, contractData, number, preStateRoot);
+                    checkCreateResult(tx, callableResult, contractResult);
                     break;
                 case 101 :
-                    ContractResult contractResult = contractVM.call(contractData, number, preStateRoot);
-                    checkAndDealContractResult(tx, resultList, contractResult);
+                    contractResult = contractVM.call(executor, contractData, number, preStateRoot);
+                    checkCallResult(tx, callableResult, contractResult);
                     break;
                 case 102 :
-                    resultList.add(contractVM.delete(contractData, number, preStateRoot));
+                    contractResult = contractVM.delete(executor, contractData, number, preStateRoot);
+                    isDelete = checkDeleteResult(tx, callableResult, contractResult);
                     break;
                 default:
                     break;
             }
         }
-        //TODO 批量提交，需要把这一次的`localProgramExecutor`拿出来，最后几个线程的结果都出来后一起提交
-        //Result<byte[]> result = contractVM.commitBatchExecute();
-        //contractVM.removeBatchExecute();
         return callableResult;
     }
 
-    private void checkAndDealContractResult(Transaction tx, List<ContractResult> resultList, ContractResult contractResult) {
-        boolean isConflict = checker.checkConflictAndCommit(tx, contractResult, commitSet);
-        if(isConflict) {
-            //TODO 合约结果设置为失败
-            contractResult.setError(true);
-            contractResult.setRevert(true);
+    private void checkCreateResult(Transaction tx, CallableResult callableResult, ContractResult contractResult) {
+        if(contractResult.isSuccess()) {
+            commitSet.add(contract);
         }
+        List<ContractResult> resultList = callableResult.getResultList();
         resultList.add(contractResult);
     }
 
+
+    private void checkCallResult(Transaction tx, CallableResult callableResult, ContractResult contractResult) {
+        boolean isConflict = checker.checkConflictAndCommit(tx, contractResult, commitSet);
+        List<ContractResult> resultList = callableResult.getResultList();
+        List<ContractResult> reCallList = callableResult.getReCallList();
+        if(isConflict) {
+            // 冲突后，添加到重新执行的集合中
+            reCallList.add(contractResult);
+        } else {
+            // 没有冲突
+            if(contractResult.isSuccess()) {
+                // 执行成功，检查与执行失败的交易是否有冲突，把执行失败的交易添加到重新执行的集合中
+                checkConflictWithFailedMap(callableResult, contractResult);
+                // 本合约与成功执行的其他合约没有冲突，提交本合约
+                resultList.add(contractResult);
+                commitContract(contractResult);
+            } else {
+                // 执行失败，添加到执行失败的集合中
+                putAll(callableResult.getFailedMap(), contractResult);
+            }
+        }
+    }
+
+    private void commitContract(ContractResult contractResult) {
+        Object txTrackObj = contractResult.getTxTrack();
+        if(txTrackObj != null && txTrackObj instanceof ProgramExecutor) {
+            ProgramExecutor txTrack = (ProgramExecutor) txTrackObj;
+            txTrack.commit();
+        }
+    }
+
+    private void checkConflictWithFailedMap(CallableResult callableResult, ContractResult contractResult) {
+        Map<String, Set<ContractResult>> failedMap = callableResult.getFailedMap();
+        Set<String> addressSet = collectAddress(contractResult);
+        List<ContractResult> reCallList = callableResult.getReCallList();
+        for(String address : addressSet) {
+            reCallList.addAll(failedMap.remove(address));
+        }
+    }
+
+    private boolean checkDeleteResult(Transaction tx, CallableResult callableResult, ContractResult contractResult) {
+        boolean result = false;
+        if(contractResult.isSuccess()) {
+            result = true;
+        }
+        List<ContractResult> resultList = callableResult.getResultList();
+        resultList.add(contractResult);
+        return result;
+    }
 }

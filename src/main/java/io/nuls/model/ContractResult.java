@@ -24,6 +24,7 @@
 package io.nuls.model;
 
 import io.nuls.contract.dto.ContractTransfer;
+import io.nuls.kernel.utils.AddressTool;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -82,5 +83,22 @@ public class ContractResult {
 
     public boolean isSuccess() {
         return !error && !revert;
+    }
+
+    public static ContractResult getFailed(ContractData contractData) {
+        ContractResult contractResult = new ContractResult();
+        contractResult.setContractAddress(AddressTool.getAddress(contractData.getContractAddress()));
+        contractResult.setGasUsed(0L);
+        contractResult.setPrice(contractData.getPrice());
+        contractResult.setSender(AddressTool.getAddress(contractData.getSender()));
+        contractResult.setError(true);
+        contractResult.setRevert(true);
+        return contractResult;
+    }
+
+    public static ContractResult getFailed(ContractData contractData, String msg) {
+        ContractResult result = getFailed(contractData);
+        result.setErrorMessage(msg);
+        return result;
     }
 }

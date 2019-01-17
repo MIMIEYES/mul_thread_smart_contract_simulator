@@ -23,6 +23,12 @@
  */
 package io.nuls.utils;
 
+import io.nuls.kernel.utils.AddressTool;
+import io.nuls.model.ContractResult;
+
+import java.util.*;
+import java.util.stream.Collectors;
+
 /**
  * @desription:
  * @author: PierreLuo
@@ -43,4 +49,81 @@ public class ContractUtil {
     }
 
 
+    public static void put(Map<String, Set<ContractResult>> map, String contractAddress, ContractResult result) {
+        Set<ContractResult> resultSet = map.get(contractAddress);
+        if(resultSet == null) {
+            resultSet = new HashSet<>();
+            map.put(contractAddress, resultSet);
+        }
+        resultSet.add(result);
+    }
+
+    public static void putAll(Map<String, Set<ContractResult>> map, Map<String, Set<ContractResult>> collectAddress) {
+        Set<Map.Entry<String, Set<ContractResult>>> entries = collectAddress.entrySet();
+        for(Map.Entry<String, Set<ContractResult>> entry : entries) {
+            String contractAddress = entry.getKey();
+            Set<ContractResult> contractResultSet = entry.getValue();
+
+            Set<ContractResult> resultSet = map.get(contractAddress);
+            if(resultSet == null) {
+                resultSet = new HashSet<>();
+                map.put(contractAddress, resultSet);
+            }
+            resultSet.addAll(contractResultSet);
+        }
+    }
+
+    public static void putAll(Map<String, Set<ContractResult>> map, ContractResult contractResult) {
+        Set<String> addressSet = collectAddress(contractResult);
+        for(String address : addressSet) {
+            put(map, address, contractResult);
+        }
+    }
+
+    public static Set<String> collectAddress(ContractResult result) {
+        Set<String> set = new HashSet<>();
+        set.add(AddressTool.getStringAddressByBytes(result.getContractAddress()));
+        set.addAll(result.getContractAddressInnerCallSet());
+
+        result.getTransfers().stream().forEach(transfer -> {
+            if(ContractUtil.isLegalContractAddress(transfer.getFrom())) {
+                set.add(AddressTool.getStringAddressByBytes(transfer.getFrom()));
+            }
+            if(ContractUtil.isLegalContractAddress(transfer.getTo())) {
+                set.add(AddressTool.getStringAddressByBytes(transfer.getTo()));
+            }
+        });
+        return set;
+    }
+
+    /**
+     * @param needReCallList
+     * @return 去掉重复的交易，并按照时间降序排列
+     */
+    public static List<ContractResult> deduplicationAndOrder(List<ContractResult> contractResultList) {
+        return contractResultList.stream().collect(Collectors.toSet()).stream()
+                .collect(Collectors.toList()).stream().sorted(CompareTx.getInstance()).collect(Collectors.toList());
+    }
+
+    /**
+     * @param list
+     * @return 收集合约执行中所有出现过的合约地址，包括内部调用合约，合约转账
+     */
+    public static Map<String, Set<ContractResult>> collectAddressMap(List<ContractResult> contractResultList) {
+        Map<String, Set<ContractResult>> map = new HashMap<>();
+        for(ContractResult result : contractResultList) {
+            put(map, AddressTool.getStringAddressByBytes(result.getContractAddress()), result);
+            result.getContractAddressInnerCallSet().stream().forEach(inner -> put(map, inner, result));
+
+            result.getTransfers().stream().forEach(transfer -> {
+                if(ContractUtil.isLegalContractAddress(transfer.getFrom())) {
+                    put(map, AddressTool.getStringAddressByBytes(transfer.getFrom()), result);
+                }
+                if(ContractUtil.isLegalContractAddress(transfer.getTo())) {
+                    put(map, AddressTool.getStringAddressByBytes(transfer.getTo()), result);
+                }
+            });
+        }
+        return map;
+    }
 }

@@ -27,12 +27,8 @@ import io.nuls.model.*;
 import io.nuls.service.*;
 import io.nuls.utils.BeanContext;
 
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
-
-import static org.apache.commons.lang3.StringUtils.EMPTY;
 
 /**
  * @author: PierreLuo
@@ -51,11 +47,13 @@ public class ContractServiceImpl implements ContractService {
     @Override
     public Result invokeContract(List<Transaction> txList, long number, String preStateRoot) {
         Map<String, List<Transaction>> listMap = addressDistribution.distribution(txList);
-        List<CallableResult> callableResultList = contractCaller.caller(listMap, number, preStateRoot);
-        //AnalyzerResult analyzerResult = resultAnalyzer.analysis(callableResultList);
-        //List<ContractResult> resultList = resultHanlder.handleAnalyzerResult(callableResultList, analyzerResult, number, preStateRoot);
-        //return Result.getSuccess().setData(resultList);
-        return Result.getSuccess();
+        CallerResult callerResult = contractCaller.caller(listMap, number, preStateRoot);
+        AnalyzerResult analyzerResult = resultAnalyzer.analysis(callerResult.getCallableResultList());
+        //TODO resultList 作用???
+        List<ContractResult> resultList = resultHanlder.handleAnalyzerResult(callerResult.getProgramExecutor(), analyzerResult, number, preStateRoot);
+        Result<byte[]> batchExecuteResult = contractCaller.commitBatchExecute(callerResult.getProgramExecutor());
+        byte[] stateRoot = batchExecuteResult.getData();
+        return Result.getSuccess().setData(stateRoot);
     }
 
 }
