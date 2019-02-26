@@ -30,10 +30,13 @@ import io.nuls.helper.ContractConflictChecker;
 import io.nuls.model.*;
 import io.nuls.service.ContractCaller;
 import io.nuls.service.ContractVM;
+import io.nuls.utils.BeanContext;
 import org.spongycastle.util.encoders.Hex;
 
 import java.util.*;
 import java.util.concurrent.Future;
+
+import static io.nuls.utils.ContractUtil.makeContractResult;
 
 /**
  * @author: PierreLuo
@@ -41,7 +44,7 @@ import java.util.concurrent.Future;
  */
 public class ContractCallerImpl implements ContractCaller {
 
-    private ContractVM contractVM;
+    private ContractVM contractVM = BeanContext.getBean(ContractVM.class);
 
 
     @Override
@@ -90,17 +93,24 @@ public class ContractCallerImpl implements ContractCaller {
     public List<ContractResult> callerReCallTx(ProgramExecutor batchExecutor, List<Transaction> reCallTxList, long number, String preStateRoot) {
         List<ContractResult> resultList = new ArrayList<>();
         ContractData contractData;
+        ContractResult contractResult;
         for(Transaction tx : reCallTxList) {
             contractData = tx.getTxData();
             switch (tx.getType()) {
                 case 100 :
-                    resultList.add(contractVM.create(batchExecutor, contractData, number, preStateRoot));
+                    contractResult = contractVM.create(batchExecutor, contractData, number, preStateRoot);
+                    makeContractResult(tx, contractResult);
+                    resultList.add(contractResult);
                     break;
                 case 101 :
-                    resultList.add(contractVM.call(batchExecutor, contractData, number, preStateRoot));
+                    contractResult = contractVM.call(batchExecutor, contractData, number, preStateRoot);
+                    makeContractResult(tx, contractResult);
+                    resultList.add(contractResult);
                     break;
                 case 102 :
-                    resultList.add(contractVM.delete(batchExecutor, contractData, number, preStateRoot));
+                    contractResult = contractVM.delete(batchExecutor, contractData, number, preStateRoot);
+                    makeContractResult(tx, contractResult);
+                    resultList.add(contractResult);
                     break;
                 default:
                     break;

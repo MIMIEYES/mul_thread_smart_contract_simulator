@@ -25,6 +25,7 @@ package io.nuls.utils;
 
 import io.nuls.kernel.utils.AddressTool;
 import io.nuls.model.ContractResult;
+import io.nuls.model.Transaction;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -83,7 +84,10 @@ public class ContractUtil {
     public static Set<String> collectAddress(ContractResult result) {
         Set<String> set = new HashSet<>();
         set.add(AddressTool.getStringAddressByBytes(result.getContractAddress()));
-        set.addAll(result.getContractAddressInnerCallSet());
+        Set<String> innerCallSet = result.getContractAddressInnerCallSet();
+        if(innerCallSet != null) {
+            set.addAll(innerCallSet);
+        }
 
         result.getTransfers().stream().forEach(transfer -> {
             if(ContractUtil.isLegalContractAddress(transfer.getFrom())) {
@@ -125,5 +129,10 @@ public class ContractUtil {
             });
         }
         return map;
+    }
+
+    public static void makeContractResult(Transaction tx, ContractResult contractResult) {
+        contractResult.setTx(tx);
+        contractResult.setTxHash(tx.getHash());
     }
 }

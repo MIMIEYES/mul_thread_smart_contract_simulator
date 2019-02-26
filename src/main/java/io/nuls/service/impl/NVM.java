@@ -31,6 +31,7 @@ import io.nuls.kernel.utils.AddressTool;
 import io.nuls.model.ContractData;
 import io.nuls.model.ContractResult;
 import io.nuls.service.ContractVM;
+import io.nuls.utils.BeanContext;
 import lombok.Getter;
 import lombok.Setter;
 import org.bouncycastle.util.encoders.Hex;
@@ -38,6 +39,8 @@ import org.bouncycastle.util.encoders.Hex;
 import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * @author: PierreLuo
@@ -47,7 +50,7 @@ import java.util.List;
 @Setter
 public class NVM implements ContractVM {
 
-    private ProgramExecutor programExecutor;
+    private ProgramExecutor programExecutor = BeanContext.getBean(ProgramExecutor.class);
 
     @Override
     public ContractResult create(ProgramExecutor executor, ContractData create, long number, String preStateRoot) {
@@ -145,8 +148,13 @@ public class NVM implements ContractVM {
         contractResult.setResult(programResult.getResult());
         contractResult.setEvents(programResult.getEvents());
         contractResult.setTransfers(generateContractTransfer(programResult.getTransfers()));
+        contractResult.setContractAddressInnerCallSet(generateInnerCallSet(programResult.getInternalCalls()));
 
         return contractResult;
+    }
+
+    private Set<String> generateInnerCallSet(List<ProgramInternalCall> internalCalls) {
+        return internalCalls.stream().map(a -> AddressTool.getStringAddressByBytes(a.getContractAddress())).collect(Collectors.toSet());
     }
 
     @Override

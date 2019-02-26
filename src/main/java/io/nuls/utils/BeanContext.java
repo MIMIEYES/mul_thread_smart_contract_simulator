@@ -38,6 +38,10 @@ public class BeanContext {
         beans.put(itf.getName(), impl.newInstance());
     }
 
+    public static void register(Class itf, Object impl) {
+        beans.put(itf.getName(), impl);
+    }
+
     public static <T> T getBean(Class<T> tClass) {
         Object o = beans.get(tClass.getName());
         return tClass.cast(o);

@@ -496,13 +496,13 @@ public class ProgramExecutorImpl implements ProgramExecutor {
     }
 
     private void checkThread() {
-        if (thread == null) {
-            throw new RuntimeException("must use the begin method");
-        }
-        Thread currentThread = Thread.currentThread();
-        if (!currentThread.equals(thread)) {
-            throw new RuntimeException(String.format("method must be executed in %s, current %s", thread, currentThread));
-        }
+        //if (thread == null) {
+        //    throw new RuntimeException("must use the begin method");
+        //}
+        //Thread currentThread = Thread.currentThread();
+        //if (!currentThread.equals(thread)) {
+        //    throw new RuntimeException(String.format("method must be executed in %s, current %s", thread, currentThread));
+        //}
     }
 
     private static List<ProgramMethod> getProgramMethods(Map<String, ClassCode> classCodes) {

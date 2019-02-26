@@ -23,14 +23,11 @@
  */
 package io.nuls.helper;
 
-import io.nuls.kernel.utils.AddressTool;
 import io.nuls.model.ContractResult;
 import io.nuls.model.Transaction;
-import io.nuls.utils.ContractUtil;
 import lombok.Getter;
 import lombok.Setter;
 
-import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -52,7 +49,7 @@ public class ContractConflictChecker {
 
     private Set<String>[] contractSetArray;
 
-    public boolean checkConflictAndCommit(Transaction tx, ContractResult contractResult, Set<String> commitSet) {
+    public boolean checkConflict(Transaction tx, ContractResult contractResult, Set<String> commitSet) {
         lock.lock();
         try {
             boolean isConflict = false;
@@ -63,17 +60,17 @@ public class ContractConflictChecker {
                     break;
                 }
             }
-            dealResult(tx, contractResult);
-            commitSet.addAll(collectAddress);
+            if(!isConflict) {
+                if(contractResult.isSuccess()) {
+                    commitSet.addAll(collectAddress);
+                }
+            }
+
             return isConflict;
         } finally {
             lock.unlock();
         }
 
-    }
-
-    private void dealResult(Transaction tx, ContractResult contractResult) {
-        //TODO 处理结果
     }
 
     private boolean containAddress(String address, Set<String> commitSet) {

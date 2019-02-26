@@ -24,6 +24,10 @@
  */
 package io.nuls.model;
 
+import io.nuls.contract.util.ContractUtil;
+
+import java.util.UUID;
+
 /**
  * @author Niels
  */
@@ -33,16 +37,36 @@ public class Transaction {
     private long blockHeight = -1L;
     private int type;
     private long time;
-    private ContractData txData;
+    private CallContractData txData;
     private String remark;
 
-    public Transaction(String hash, long blockHeight, int type, long time, ContractData txData, String remark) {
+    public Transaction(String hash, long blockHeight, int type, long time, CallContractData txData, String remark) {
         this.hash = hash;
         this.blockHeight = blockHeight;
         this.type = type;
         this.time = time;
         this.txData = txData;
         this.remark = remark;
+    }
+
+    public static Transaction newInstance(String sender, String contractAddress, long value, String methodName, Object[] args) {
+        String hash = UUID.randomUUID().toString();
+        long blockHeight = 1111L;
+        int type = 101;
+        long time = System.currentTimeMillis();
+        CallContractData txData = new CallContractData();
+        txData.setSender(sender);
+        txData.setContractAddress(contractAddress);
+        txData.setValue(value);
+        txData.setGasLimit(10000000L);
+        txData.setPrice(25L);
+        txData.setMethodName(methodName);
+        String[][] args2 = ContractUtil.twoDimensionalArray(args);
+        txData.setArgsCount((byte) args.length);
+        txData.setArgs(args2);
+        String remark = "test multy thread contract";
+        Transaction tx = new Transaction(hash, blockHeight, type, time, txData, remark);
+        return tx;
     }
 
     public String getHash() {
@@ -81,7 +105,7 @@ public class Transaction {
         return txData;
     }
 
-    public void setTxData(ContractData txData) {
+    public void setTxData(CallContractData txData) {
         this.txData = txData;
     }
 

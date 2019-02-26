@@ -24,13 +24,13 @@
 package io.nuls.callable;
 
 import io.nuls.contract.vm.program.ProgramExecutor;
-import io.nuls.core.tools.log.Log;
 import io.nuls.helper.ContractConflictChecker;
 import io.nuls.model.CallableResult;
 import io.nuls.model.ContractData;
 import io.nuls.model.ContractResult;
 import io.nuls.model.Transaction;
 import io.nuls.service.ContractVM;
+import io.nuls.utils.BeanContext;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -49,7 +49,7 @@ import static io.nuls.utils.ContractUtil.*;
 @Setter
 public class ContractTxCallable implements Callable<CallableResult> {
 
-    private ContractVM contractVM;
+    private ContractVM contractVM = BeanContext.getBean(ContractVM.class);
     private ProgramExecutor executor;
     private String contract;
     private List<Transaction> txList;
@@ -113,8 +113,10 @@ public class ContractTxCallable implements Callable<CallableResult> {
     }
 
     private void checkCreateResult(Transaction tx, CallableResult callableResult, ContractResult contractResult) {
+        makeContractResult(tx, contractResult);
         if(contractResult.isSuccess()) {
             commitSet.add(contract);
+            commitContract(contractResult);
         }
         List<ContractResult> resultList = callableResult.getResultList();
         resultList.add(contractResult);
@@ -122,24 +124,30 @@ public class ContractTxCallable implements Callable<CallableResult> {
 
 
     private void checkCallResult(Transaction tx, CallableResult callableResult, ContractResult contractResult) {
-        boolean isConflict = checker.checkConflictAndCommit(tx, contractResult, commitSet);
-        List<ContractResult> resultList = callableResult.getResultList();
+        makeContractResult(tx, contractResult);
         List<ContractResult> reCallList = callableResult.getReCallList();
+        boolean isConflict = checker.checkConflict(tx, contractResult, commitSet);
         if(isConflict) {
             // 冲突后，添加到重新执行的集合中
             reCallList.add(contractResult);
         } else {
-            // 没有冲突
-            if(contractResult.isSuccess()) {
-                // 执行成功，检查与执行失败的交易是否有冲突，把执行失败的交易添加到重新执行的集合中
-                checkConflictWithFailedMap(callableResult, contractResult);
-                // 本合约与成功执行的其他合约没有冲突，提交本合约
-                resultList.add(contractResult);
-                commitContract(contractResult);
-            } else {
-                // 执行失败，添加到执行失败的集合中
-                putAll(callableResult.getFailedMap(), contractResult);
-            }
+
+            // 没有冲突, 处理合约结果
+            dealResult(tx, callableResult, contractResult);
+        }
+    }
+
+    private void dealResult(Transaction tx, CallableResult callableResult, ContractResult contractResult) {
+        //TODO 处理结果
+        if(contractResult.isSuccess()) {
+            // 执行成功，检查与执行失败的交易是否有冲突，把执行失败的交易添加到重新执行的集合中
+            checkConflictWithFailedMap(callableResult, contractResult);
+            // 本合约与成功执行的其他合约没有冲突，提交本合约
+            callableResult.getResultList().add(contractResult);
+            commitContract(contractResult);
+        } else {
+            // 执行失败，添加到执行失败的集合中
+            putAll(callableResult.getFailedMap(), contractResult);
         }
     }
 
@@ -156,14 +164,19 @@ public class ContractTxCallable implements Callable<CallableResult> {
         Set<String> addressSet = collectAddress(contractResult);
         List<ContractResult> reCallList = callableResult.getReCallList();
         for(String address : addressSet) {
-            reCallList.addAll(failedMap.remove(address));
+            Set<ContractResult> removedSet = failedMap.remove(address);
+            if(removedSet != null) {
+                reCallList.addAll(removedSet);
+            }
         }
     }
 
     private boolean checkDeleteResult(Transaction tx, CallableResult callableResult, ContractResult contractResult) {
+        makeContractResult(tx, contractResult);
         boolean result = false;
         if(contractResult.isSuccess()) {
             result = true;
+            commitContract(contractResult);
         }
         List<ContractResult> resultList = callableResult.getResultList();
         resultList.add(contractResult);
